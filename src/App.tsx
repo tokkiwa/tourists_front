@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { profileApi, InitialUserProfile, authApi } from './services/api';
 
 // AIの表情タイプ定義
 type AiEmotion = 'normal' | 'smile' | 'cry' | 'mad';
@@ -96,17 +97,46 @@ const Header = ({ userName, onNotificationTest, notificationEnabled }: {
     </div>
   </header>
 );// AIアバターコンポーネント
-const AiAvatar = ({ emotion = 'normal' }: { emotion?: AiEmotion }) => {
+const AiAvatar = ({ emotion = 'normal', size = 'large' }: {
+  emotion?: AiEmotion,
+  size?: 'small' | 'large'
+}) => {
   const getAvatarSrc = (emotion: AiEmotion) => {
     return `/assets/man_1_${emotion}.png`;
   };
 
+  const sizeClasses = {
+    small: {
+      container: 'w-16 h-16 rounded-xl',
+      image: 'w-14 h-14',
+      indicator: 'w-3 h-3 bottom-1 right-1'
+    },
+    large: {
+      container: 'w-32 h-32 rounded-2xl',
+      image: 'w-28 h-28',
+      indicator: 'w-4 h-4 bottom-2 right-2'
+    }
+  };
+
+  const classes = sizeClasses[size];
+
   return (
-    <img
-      src={getAvatarSrc(emotion)}
-      alt="AIアシスタント"
-      className="w-32 h-32 flex-shrink-0 object-contain"
-    />
+    <div className="relative">
+      <div className={`${classes.container} bg-gradient-to-br from-slate-100 via-indigo-50 to-blue-100 border-2 border-slate-200 shadow-lg overflow-hidden flex items-center justify-center backdrop-blur-sm`}>
+        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+        <img
+          src={getAvatarSrc(emotion)}
+          alt="AIアシスタント"
+          className={`${classes.image} object-cover object-top relative z-10 drop-shadow-sm`}
+        />
+      </div>
+      {/* オンライン状態インジケーター */}
+      <div className={`absolute ${classes.indicator} bg-green-500 border-2 border-white rounded-full shadow-sm`}>
+        <div className="w-full h-full bg-green-400 rounded-full animate-pulse"></div>
+      </div>
+      {/* 微細な光沢効果 */}
+      <div className={`absolute top-1 left-1 ${size === 'large' ? 'w-6 h-6' : 'w-3 h-3'} bg-white/30 rounded-full blur-sm`}></div>
+    </div>
   );
 };
 
@@ -208,6 +238,213 @@ const PaymentAnalyzer = {
       reason: '正常な支出です。'
     };
   }
+};
+
+// 認証ステップの定義
+type AuthStep = 'login' | 'register';
+
+// 認証画面コンポーネント
+const AuthScreen = ({
+  onAuthSuccess
+}: {
+  onAuthSuccess: (token: string, userData: any) => void
+}) => {
+  const [currentStep, setCurrentStep] = useState<AuthStep>('login');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError(''); // エラーをクリア
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      console.log('🚀 [認証] ログイン開始');
+      console.log('   - エンドポイント: POST /api/auth/login');
+      console.log('   - Email:', formData.email);
+
+      const response = await authApi.login({
+        email: formData.email,
+        password: formData.password
+      });
+
+      console.log('✅ [認証] ログイン成功');
+      console.log('   - トークン:', response.access_token?.substring(0, 20) + '...');
+      console.log('   - ユーザー情報:', response.user);
+
+      // トークンをローカルストレージに保存
+      localStorage.setItem('auth_token', response.access_token);
+      localStorage.setItem('refresh_token', response.refresh_token);
+
+      onAuthSuccess(response.access_token, response.user);
+    } catch (error: any) {
+      console.error('❌ [認証] ログインエラー:', error);
+      setError(error.response?.data?.error || 'ログインに失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    // パスワード確認
+    if (formData.password !== formData.confirmPassword) {
+      setError('パスワードが一致しません');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      console.log('🚀 [認証] ユーザー登録開始');
+      console.log('   - エンドポイント: POST /api/auth/register');
+      console.log('   - Name:', formData.name);
+      console.log('   - Email:', formData.email);
+
+      const response = await authApi.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      });
+
+      console.log('✅ [認証] ユーザー登録成功');
+      console.log('   - レスポンス:', response);
+
+      // 登録成功後、ログイン画面に切り替え
+      setCurrentStep('login');
+      setError('');
+      setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+      // 成功メッセージを一時的に表示
+      alert('登録が完了しました。メールを確認してからログインしてください。');
+    } catch (error: any) {
+      console.error('❌ [認証] 登録エラー:', error);
+      setError(error.response?.data?.error || 'ユーザー登録に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-sm mx-auto bg-slate-50 h-screen flex flex-col shadow-2xl overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="flex-grow flex flex-col justify-center p-6">
+        {/* ヘッダー */}
+        <div className="text-center mb-8">
+          <div className="mb-6">
+            <AiAvatar emotion="normal" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">
+            AI財務アシスタント
+          </h1>
+          <p className="text-sm text-slate-600">
+            {currentStep === 'login' ? 'ログインしてください' : 'アカウントを作成'}
+          </p>
+        </div>
+
+        {/* エラーメッセージ */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        {/* フォーム */}
+        <form onSubmit={currentStep === 'login' ? handleLogin : handleRegister} className="space-y-4">
+          {currentStep === 'register' && (
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              placeholder="お名前"
+              className="w-full p-4 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              required
+            />
+          )}
+
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            placeholder="メールアドレス"
+            className="w-full p-4 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            required
+          />
+
+          <input
+            type="password"
+            value={formData.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            placeholder="パスワード"
+            className="w-full p-4 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            required
+          />
+
+          {currentStep === 'register' && (
+            <input
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+              placeholder="パスワード確認"
+              className="w-full p-4 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              required
+            />
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-indigo-600 text-white py-3 px-6 rounded-2xl hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50"
+          >
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {currentStep === 'login' ? 'ログイン中...' : '登録中...'}
+              </span>
+            ) : (
+              currentStep === 'login' ? 'ログイン' : 'アカウント作成'
+            )}
+          </button>
+        </form>
+
+        {/* フォーム切り替え */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => {
+              setCurrentStep(currentStep === 'login' ? 'register' : 'login');
+              setError('');
+              setFormData({
+                name: '',
+                email: formData.email, // メールアドレスは保持
+                password: '',
+                confirmPassword: ''
+              });
+            }}
+            className="text-indigo-600 hover:text-indigo-700 text-sm underline"
+          >
+            {currentStep === 'login'
+              ? 'アカウントをお持ちでない方はこちら'
+              : 'すでにアカウントをお持ちの方はこちら'
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // 初期設定ステップの定義
@@ -682,12 +919,97 @@ const getEmotionFromMessage = (text: string): AiEmotion => {
 
 // メインのAppコンポーネント
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiUserData, setApiUserData] = useState<any>(null);
+
+  // コンポーネントマウント時にローカルストレージから認証情報を読み込み
+  useEffect(() => {
+    const savedToken = localStorage.getItem('auth_token');
+    const savedProfile = localStorage.getItem('user_profile');
+
+    if (savedToken) {
+      setAuthToken(savedToken);
+      setIsAuthenticated(true);
+
+      if (savedProfile) {
+        setUserProfile(JSON.parse(savedProfile));
+        setIsSetupComplete(true);
+      }
+
+      loadUserProfile(savedToken);
+    }
+  }, []);
+
+  // APIからユーザープロフィールを読み込む
+  const loadUserProfile = async (token: string) => {
+    try {
+      setIsLoading(true);
+
+      console.log('🚀 [API呼び出し] プロフィール取得開始');
+      console.log('   - エンドポイント: GET /api/profiles/me');
+      console.log('   - フルURL: http://localhost:5001/api/profiles/me');
+      console.log('   - 認証トークン:', token.substring(0, 20) + '...');
+
+      const startTime = Date.now();
+      const apiProfile = await profileApi.getMyProfile(token);
+      const endTime = Date.now();
+
+      console.log('✅ [API成功] プロフィール取得完了');
+      console.log('   - レスポンス時間:', endTime - startTime, 'ms');
+      console.log('   - 取得データ:', apiProfile);
+
+      // APIのプロフィール形式をアプリの形式に変換
+      const convertedProfile: UserProfile = {
+        name: apiProfile.name,
+        annualIncome: '500万円', // デフォルト値（後で拡張）
+        netWorth: '300万円',     // デフォルト値（後で拡張）
+        familySize: apiProfile.family_structure === '既婚' ? '2人家族' : '1人家族',
+        age: apiProfile.birth_date ? calculateAge(apiProfile.birth_date) : '28歳'
+      };
+
+      console.log('🔄 [データ変換] APIプロフィール → アプリプロフィール');
+      console.log('   - 変換前:', apiProfile);
+      console.log('   - 変換後:', convertedProfile);
+
+      setUserProfile(convertedProfile);
+      localStorage.setItem('user_profile', JSON.stringify(convertedProfile));
+      console.log('💾 [ローカル保存] プロフィールをローカルストレージに保存');
+
+    } catch (error) {
+      console.error('❌ [API エラー] プロフィール読み込み失敗');
+      console.error('   - エンドポイント: GET /api/profiles/me');
+      console.error('   - エラー詳細:', error);
+
+      if (error instanceof Error) {
+        console.error('   - エラーメッセージ:', error.message);
+      }
+    } finally {
+      setIsLoading(false);
+      console.log('🏁 [API完了] loadUserProfile処理終了');
+    }
+  };
+
+  // 生年月日から年齢を計算
+  const calculateAge = (birthDate: string): string => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+
+    return `${age}歳`;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -730,44 +1052,223 @@ export default function App() {
     setIsChatPopupOpen(false);
   };
 
-  const handleSetupComplete = async (profile: UserProfile) => {
-    console.log('Setup complete called with profile:', profile); // デバッグ用
-    setUserProfile(profile);
+  // 認証成功時の処理
+  const handleAuthSuccess = async (token: string, userData: any) => {
+    console.log('🎉 [認証] 認証成功、ユーザーデータ:', userData);
 
-    // 通知許可を取得
-    console.log('初期設定完了時に通知許可を要求');
-    const hasPermission = await NotificationUtils.requestPermission();
-    console.log('通知許可取得結果:', hasPermission);
-    setNotificationPermission(hasPermission);
+    setAuthToken(token);
+    setApiUserData(userData);
+    setIsAuthenticated(true);
 
-    // 通知許可取得時にテスト通知を送信
-    if (hasPermission) {
-      console.log('通知許可が取得できたので、ウェルカム通知を送信');
-      NotificationUtils.sendNotification(
-        '🎉 初期設定完了',
-        {
-          body: `${profile.name}さん、セットアップが完了しました！財務アドバイスの準備ができました。`,
-          icon: '/assets/man_1_smile.png',
-          tag: 'welcome-notification'
-        }
-      );
+    // プロフィール情報があるかチェック
+    if (userData.name && userData.birth_date) {
+      console.log('📝 [認証] 既存プロフィールを検出、セットアップをスキップ');
+
+      // APIプロフィールをアプリプロフィールに変換
+      const convertedProfile: UserProfile = {
+        name: userData.name,
+        annualIncome: '500万円', // デフォルト値
+        netWorth: '300万円',     // デフォルト値
+        familySize: userData.family_structure === '既婚' ? '2人家族' : '1人家族',
+        age: userData.birth_date ? calculateAge(userData.birth_date) : '28歳'
+      };
+
+      setUserProfile(convertedProfile);
+      localStorage.setItem('user_profile', JSON.stringify(convertedProfile));
+      setIsSetupComplete(true);
+
+      // 通知許可を取得
+      const hasPermission = await NotificationUtils.requestPermission();
+      setNotificationPermission(hasPermission);
+
+      // ウェルカムメッセージ
+      const welcomeMessage: Message = {
+        sender: 'ai',
+        text: `${userData.name}さん、おかえりなさい！財務アシスタントです。今月の支出状況を確認しましょうか？`,
+        emotion: 'smile'
+      };
+      setMessages([welcomeMessage]);
+    } else {
+      console.log('📝 [認証] プロフィール未設定、初期設定を開始');
+      // プロフィール情報がない場合は初期設定に進む
     }
+  };
 
-    // 初期設定完了後の初回メッセージを生成
-    const welcomeMessage: Message = {
-      sender: 'ai',
-      text: `${profile.name}さん、初期設定ありがとうございました！年収${profile.annualIncome}、純資産${profile.netWorth}の${profile.familySize}の情報を元に、最適な財務アドバイスをいたします。
+  const handleSetupComplete = async (profile: UserProfile) => {
+    console.log('Setup complete called with profile:', profile);
+    setIsLoading(true);
+
+    try {
+      if (!authToken) {
+        console.error('❌ [初期設定] 認証トークンがありません');
+        return;
+      }
+
+      // APIのプロフィール形式に変換
+      const apiProfileData = {
+        name: profile.name,
+        birth_date: calculateBirthDate(profile.age),
+        family_structure: profile.familySize.includes('1人') ? '独身' as const : '既婚' as const,
+        number_of_children: extractChildrenCount(profile.familySize),
+        occupation: '会社員' // デフォルト値
+      };
+
+      // プロフィールをAPIに保存
+      try {
+        console.log('🚀 [API呼び出し] プロフィール保存開始');
+        console.log('   - エンドポイント: PUT /api/profiles/me');
+        console.log('   - フルURL: http://localhost:5001/api/profiles/me');
+        console.log('   - 認証トークン:', authToken.substring(0, 20) + '...');
+        console.log('   - 送信データ:', apiProfileData);
+
+        const startTime = Date.now();
+        const result = await profileApi.upsertMyProfile(authToken, apiProfileData);
+        const endTime = Date.now();
+
+        console.log('✅ [API成功] プロフィール保存完了');
+        console.log('   - レスポンス時間:', endTime - startTime, 'ms');
+        console.log('   - レスポンスデータ:', result);
+
+        // プロフィールをローカルストレージに保存（認証トークンは既に保存済み）
+        localStorage.setItem('user_profile', JSON.stringify(profile));
+        console.log('💾 [ローカル保存] プロフィールを保存');
+      } catch (apiError) {
+        console.error('❌ [API エラー] プロフィール保存失敗');
+        console.error('   - エンドポイント: PUT /api/profiles/me');
+        console.error('   - 送信データ:', apiProfileData);
+        console.error('   - エラー詳細:', apiError);
+
+        if (apiError instanceof Error) {
+          console.error('   - エラーメッセージ:', apiError.message);
+        }
+
+        // APIエラーがあってもローカルで続行
+        localStorage.setItem('user_profile', JSON.stringify(profile));
+        console.log('💾 [フォールバック] プロフィールをローカルのみで保存');
+      }
+
+      setUserProfile(profile);
+
+      // 通知許可を取得
+      console.log('初期設定完了時に通知許可を要求');
+      const hasPermission = await NotificationUtils.requestPermission();
+      console.log('通知許可取得結果:', hasPermission);
+      setNotificationPermission(hasPermission);
+
+      // 通知許可取得時にテスト通知を送信
+      if (hasPermission) {
+        console.log('通知許可が取得できたので、ウェルカム通知を送信');
+        NotificationUtils.sendNotification(
+          '🎉 初期設定完了',
+          {
+            body: `${profile.name}さん、セットアップが完了しました！財務アドバイスの準備ができました。`,
+            icon: '/assets/man_1_smile.png',
+            tag: 'welcome-notification'
+          }
+        );
+      }
+
+      // 初期設定完了後の初回メッセージを生成
+      const welcomeMessage: Message = {
+        sender: 'ai',
+        text: `${profile.name}さん、初期設定ありがとうございました！年収${profile.annualIncome}、純資産${profile.netWorth}の${profile.familySize}の情報を元に、最適な財務アドバイスをいたします。
 
 🔔 通知状態: ${hasPermission ? '✅ 有効' : '❌ 無効'}
 ブラウザ許可: ${Notification.permission}
 
-${hasPermission ? 'ブラウザ通知も有効になりました。' : 'ブラウザ通知は無効です。右上の「通知テスト」ボタンで確認してください。'}
+${hasPermission ? 'ブラウザ通知も有効になりました。' : 
+  'ブラウザ通知は無効です。右上の「通知テスト」ボタンで確認してください。'}
+`,
+        emotion: hasPermission ? 'smile' : 'normal'
+      };
+      setMessages([welcomeMessage]);
+      setIsSetupComplete(true);
 
-今月は食費が少し予算を超えていますね。近くのスーパーでお得なセール情報を集めておきました！確認しますか？`,
-      emotion: hasPermission ? 'smile' : 'normal'
-    };
-    setMessages([welcomeMessage]);
-    setIsSetupComplete(true);
+    } catch (error) {
+      console.error('初期設定完了エラー:', error);
+      // エラーがあってもローカルで続行
+      setUserProfile(profile);
+      setIsSetupComplete(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 年齢から生年月日を計算（概算）
+  const calculateBirthDate = (ageString: string): string => {
+    const age = parseInt(ageString.replace(/[^\d]/g, '')) || 28;
+    const currentYear = new Date().getFullYear();
+    const birthYear = currentYear - age;
+    return `${ birthYear }-01-01`; // 1月1日として概算
+  };
+
+  // 家族構成から子供の数を抽出
+  const extractChildrenCount = (familySize: string): number => {
+    const match = familySize.match(/(\d+)人/);
+    if (!match) return 0;
+    const totalMembers = parseInt(match[1]);
+    return Math.max(0, totalMembers - 2); // 両親を除いた数
+  };
+
+  // プロフィール更新（将来の機能拡張用）
+  const updateProfile = async (updatedProfile: Partial<UserProfile>) => {
+    console.log('🔄 プロフィール更新開始');
+    console.log('📝 更新データ:', updatedProfile);
+    console.log('🔑 認証トークン:', authToken ? '有効' : '無効');
+    console.log('👤 現在のプロフィール:', userProfile);
+
+    if (!authToken || !userProfile) {
+      console.log('❌ 認証トークンまたはプロフィールが無効です');
+      return;
+    }
+
+    const startTime = performance.now();
+
+    try {
+      setIsLoading(true);
+      console.log('⏳ ローディング状態: ON');
+
+      const apiProfileData = {
+        name: updatedProfile.name || userProfile.name,
+        birth_date: updatedProfile.age ? calculateBirthDate(updatedProfile.age) : calculateBirthDate(userProfile.age),
+        family_structure: (updatedProfile.familySize || userProfile.familySize).includes('1人') ? '独身' as const : '既婚' as const,
+        number_of_children: extractChildrenCount(updatedProfile.familySize || userProfile.familySize)
+      };
+
+      console.log('🔧 API送信データ変換:');
+      console.log('  - name:', apiProfileData.name);
+      console.log('  - birth_date:', apiProfileData.birth_date);
+      console.log('  - family_structure:', apiProfileData.family_structure);
+      console.log('  - number_of_children:', apiProfileData.number_of_children);
+
+      console.log('📡 API呼び出し: PUT /api/profiles/me');
+      const response = await profileApi.upsertMyProfile(authToken, apiProfileData);
+      const endTime = performance.now();
+
+      console.log('✅ API応答受信 (時間:', Math.round(endTime - startTime), 'ms)');
+      console.log('📨 API応答データ:', response);
+
+      const newProfile = { ...userProfile, ...updatedProfile };
+      setUserProfile(newProfile);
+      localStorage.setItem('user_profile', JSON.stringify(newProfile));
+
+      console.log('💾 ローカルストレージ保存完了');
+      console.log('🎯 更新されたプロフィール:', newProfile);
+      console.log('✨ プロフィール更新成功');
+    } catch (error) {
+      const endTime = performance.now();
+      console.error('❌ プロフィール更新エラー (時間:', Math.round(endTime - startTime), 'ms)');
+      console.error('🔍 エラー詳細:', error);
+
+      if (error instanceof Error) {
+        console.error('📋 エラーメッセージ:', error.message);
+        console.error('📍 エラースタック:', error.stack);
+      }
+    } finally {
+      setIsLoading(false);
+      console.log('⏳ ローディング状態: OFF');
+      console.log('🏁 プロフィール更新処理完了');
+    }
   };  // 支払い通知を処理する関数
   const handlePaymentNotification = async (payment: PaymentNotification) => {
     console.log('支払い通知処理開始:', payment);
@@ -808,7 +1309,7 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' : 'ブラ�
       // チャットにもメッセージを追加
       const alertMessage: Message = {
         sender: 'ai',
-        text: `${userProfile.name}さん、支出アラートです！${analysis.reason}`,
+        text: `${ userProfile.name } さん、支出アラートです！${ analysis.reason } `,
         emotion: 'mad'
       };
 
@@ -874,6 +1375,25 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' : 'ブラ�
     handlePaymentNotification(randomPayment);
   };
 
+  // ローディング画面
+  if (isLoading) {
+    return (
+      <div className="max-w-sm mx-auto bg-slate-50 h-screen flex flex-col shadow-2xl overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="flex-grow flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-slate-600">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 認証されていない場合は認証画面を表示
+  if (!isAuthenticated) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
+
   // 初期設定が完了していない場合は初期設定画面を表示
   if (!isSetupComplete) {
     return <InitialSetup onComplete={handleSetupComplete} />;
@@ -909,6 +1429,13 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' : 'ブラ�
         onInputChange={handleInputChange}
         onSendMessage={handleSendMessage}
       />
+
+      {/* プロフィール同期状態の表示（開発時のデバッグ用） */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-2 right-2 bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+          Auth: {isAuthenticated ? '✓' : '✗'} | API: {authToken ? '✓' : '✗'} | User: {apiUserData?.email || 'N/A'}
+        </div>
+      )}
     </div>
   );
 }

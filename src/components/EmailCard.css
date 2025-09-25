@@ -1,0 +1,163 @@
+.email-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #e0e0e0;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.email-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.email-card.amazon {
+    border-left-color: #ff9900;
+}
+
+.email-card.credit-card {
+    border-left-color: #1e88e5;
+}
+
+.email-card.personal {
+    border-left-color: #4caf50;
+}
+
+.email-card.other {
+    border-left-color: #9e9e9e;
+}
+
+.email-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.sender-info {
+    flex: 1;
+}
+
+.sender-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.sender-email {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.sender-domain {
+    font-size: 12px;
+    color: #999;
+    background: #f5f5f5;
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.timestamp {
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.email-subject {
+    margin: 12px 0;
+}
+
+.email-subject h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #333;
+    line-height: 1.4;
+}
+
+.email-body-preview {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+    border: 1px solid #e9ecef;
+}
+
+.email-body-preview pre {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #555;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.email-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.expand-btn {
+    background: #2196f3;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.expand-btn:hover {
+    background: #1976d2;
+}
+
+.message-id {
+    font-size: 12px;
+    color: #999;
+    font-family: monospace;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+    .email-card {
+        margin: 12px 0;
+        padding: 16px;
+    }
+
+    .email-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .timestamp {
+        margin-top: 8px;
+        text-align: left;
+    }
+
+    .email-subject h3 {
+        font-size: 16px;
+    }
+
+    .email-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .message-id {
+        text-align: center;
+    }
+}

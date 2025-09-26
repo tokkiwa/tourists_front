@@ -73,6 +73,319 @@ const SettingsIcon = () => (
   </svg>
 );
 
+// 分析画面コンポーネント
+const AnalysisScreen = ({ userProfile }: { userProfile: UserProfile | null }) => {
+  // モックデータ
+  const monthlyIncome = 450000;
+  const savingGoal = 80000;
+  const savingRate = 17.8;
+  const wasteAlertCount = 3;
+
+  // 資産ポートフォリオデータ
+  const portfolioData = [
+    { name: '現金', value: 40, color: '#3B82F6' },
+    { name: '積立', value: 35, color: '#10B981' },
+    { name: '個別株', value: 25, color: '#F59E0B' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* お財布スコア - ホーム画面と同じコンポーネントを使用 */}
+      <WalletScoreCard userProfile={userProfile} />
+
+      {/* 収入・貯蓄情報 */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">収入・貯蓄状況</h3>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-600">今月の収入</span>
+            <span className="font-bold text-slate-800">¥{monthlyIncome.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-600">今月の貯蓄目標</span>
+            <span className="font-bold text-green-600">¥{savingGoal.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-600">貯蓄率</span>
+            <span className="font-bold text-blue-600">{savingRate}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 無駄遣いアラート */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">無駄遣いアラート</h3>
+        <div className="flex items-center justify-between">
+          <span className="text-slate-600">今月のアラート回数</span>
+          <div className="flex items-center">
+            <span className="text-2xl font-bold text-red-500 mr-2">{wasteAlertCount}</span>
+            <span className="text-slate-600">回</span>
+          </div>
+        </div>
+        {wasteAlertCount > 0 && (
+          <p className="text-sm text-red-500 mt-2">支出パターンを見直しましょう</p>
+        )}
+      </div>
+
+      {/* 資産ポートフォリオ */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">資産ポートフォリオ</h3>
+        <div className="flex items-center justify-center mb-6">
+          <div className="relative w-52 h-52">
+            <svg className="w-52 h-52" viewBox="0 0 120 120">
+              {portfolioData.map((item, index) => {
+                const prevTotal = portfolioData.slice(0, index).reduce((sum, prev) => sum + prev.value, 0);
+                const startAngle = (prevTotal / 100) * 360;
+                const endAngle = ((prevTotal + item.value) / 100) * 360;
+                const largeArcFlag = item.value > 50 ? 1 : 0;
+
+                const startX = 60 + 45 * Math.cos((startAngle - 90) * Math.PI / 180);
+                const startY = 60 + 45 * Math.sin((startAngle - 90) * Math.PI / 180);
+                const endX = 60 + 45 * Math.cos((endAngle - 90) * Math.PI / 180);
+                const endY = 60 + 45 * Math.sin((endAngle - 90) * Math.PI / 180);
+
+                const pathData = `M 60 60 L ${startX} ${startY} A 45 45 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
+
+                return (
+                  <path
+                    key={index}
+                    d={pathData}
+                    fill={item.color}
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                );
+              })}
+            </svg>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {portfolioData.map((item, index) => (
+            <div key={index} className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div
+                  className="w-4 h-4 rounded-full mr-3"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-slate-600">{item.name}</span>
+              </div>
+              <span className="font-bold text-slate-800">{item.value}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 資産画面コンポーネント
+const AssetsScreen = ({ userProfile }: { userProfile: UserProfile | null }) => {
+  // モックデータ
+  const monthlyIncome = 450000;
+  const monthlyExpense = 320000;
+  const monthlySavings = monthlyIncome - monthlyExpense;
+
+  // 収入対支出データ
+  const incomeExpenseData = [
+    { name: '支出', value: monthlyExpense, color: '#EF4444', percentage: Math.round((monthlyExpense / monthlyIncome) * 100) },
+    { name: '貯蓄', value: monthlySavings, color: '#10B981', percentage: Math.round((monthlySavings / monthlyIncome) * 100) }
+  ];
+
+  // 積立投資データ（過去6ヶ月の実績 + 将来6ヶ月の予測）
+  const investmentData = [
+    { month: '4月', actual: 10000, predicted: null },
+    { month: '5月', actual: 20500, predicted: null },
+    { month: '6月', actual: 28000, predicted: null },
+    { month: '7月', actual: 35000, predicted: null },
+    { month: '8月', actual: 48000, predicted: null },
+    { month: '9月', actual: 60000, predicted: null },
+    { month: '10月', actual: null, predicted: 75000 },
+    { month: '11月', actual: null, predicted: 88000 },
+    { month: '12月', actual: null, predicted: 102000 },
+    { month: '1月', actual: null, predicted: 115000 },
+    { month: '2月', actual: null, predicted: 130000 },
+    { month: '3月', actual: null, predicted: 145000 }
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* 収入対支出の円グラフ */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">収入対支出</h3>
+        <div className="flex items-center justify-center mb-6">
+          <div className="relative w-48 h-48">
+            <svg className="w-48 h-48" viewBox="0 0 120 120">
+              {incomeExpenseData.map((item, index) => {
+                const prevTotal = incomeExpenseData.slice(0, index).reduce((sum, prev) => sum + prev.percentage, 0);
+                const startAngle = (prevTotal / 100) * 360;
+                const endAngle = ((prevTotal + item.percentage) / 100) * 360;
+                const largeArcFlag = item.percentage > 50 ? 1 : 0;
+
+                const startX = 60 + 45 * Math.cos((startAngle - 90) * Math.PI / 180);
+                const startY = 60 + 45 * Math.sin((startAngle - 90) * Math.PI / 180);
+                const endX = 60 + 45 * Math.cos((endAngle - 90) * Math.PI / 180);
+                const endY = 60 + 45 * Math.sin((endAngle - 90) * Math.PI / 180);
+
+                const pathData = `M 60 60 L ${startX} ${startY} A 45 45 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
+
+                return (
+                  <path
+                    key={index}
+                    d={pathData}
+                    fill={item.color}
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                );
+              })}
+            </svg>
+            {/* 中央の収入表示 */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-xs text-slate-500">月収</span>
+              <span className="text-lg font-bold text-slate-800">¥{monthlyIncome.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {incomeExpenseData.map((item, index) => (
+            <div key={index} className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div
+                  className="w-4 h-4 rounded-full mr-3"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-slate-600">{item.name}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-bold text-slate-800">¥{item.value.toLocaleString()}</span>
+                <span className="text-sm text-slate-500 ml-2">({item.percentage}%)</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 積立投資の折れ線グラフ */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">つみたて投資の損益と将来予想</h3>
+
+        {/* 凡例 */}
+        <div className="flex justify-center gap-6 mb-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+            <span className="text-slate-600">実績</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-1 bg-green-500 mr-2"></div>
+            <span className="text-slate-600">予測</span>
+          </div>
+        </div>
+
+        <div className="relative h-48 mb-4">
+          <svg className="w-full h-full" viewBox="0 0 360 150">
+            {/* グリッド線 */}
+            {[0, 1, 2, 3, 4, 5].map(i => (
+              <line
+                key={i}
+                x1="30"
+                y1={30 + i * 20}
+                x2="330"
+                y2={30 + i * 20}
+                stroke="#E5E7EB"
+                strokeWidth="1"
+              />
+            ))}
+
+            {/* 実績データの線 */}
+            <polyline
+              points={investmentData
+                .filter(d => d.actual !== null)
+                .map((d, i) => `${30 + i * 50},${130 - (d.actual! / 1500)}`)
+                .join(' ')}
+              fill="none"
+              stroke="#3B82F6"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* 予測データの線（点線） */}
+            <polyline
+              points={investmentData
+                .filter(d => d.predicted !== null)
+                .map((d, i) => `${180 + i * 50},${130 - (d.predicted! / 1500)}`)
+                .join(' ')}
+              fill="none"
+              stroke="#10B981"
+              strokeWidth="3"
+              strokeDasharray="5,5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* 実績データポイント */}
+            {investmentData
+              .filter(d => d.actual !== null)
+              .map((d, i) => (
+                <circle
+                  key={i}
+                  cx={30 + i * 50}
+                  cy={130 - (d.actual! / 1500)}
+                  r="4"
+                  fill="#3B82F6"
+                />
+              ))
+            }
+
+            {/* 予測データポイント */}
+            {investmentData
+              .filter(d => d.predicted !== null)
+              .map((d, i) => (
+                <circle
+                  key={i}
+                  cx={180 + i * 50}
+                  cy={130 - (d.predicted! / 1500)}
+                  r="4"
+                  fill="#10B981"
+                />
+              ))
+            }
+
+            {/* X軸ラベル */}
+            {investmentData.slice(0, 6).map((d, i) => (
+              <text
+                key={i}
+                x={30 + i * 50}
+                y={145}
+                textAnchor="middle"
+                className="text-xs fill-slate-500"
+              >
+                {d.month}
+              </text>
+            ))}
+          </svg>
+        </div>
+
+        {/* 投資サマリー */}
+        <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-slate-600">現在の評価額</span>
+            <span className="font-bold text-slate-800">¥60,000</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-slate-600">投資元本</span>
+            <span className="font-bold text-slate-800">¥50,000</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-slate-600">損益</span>
+            <span className="font-bold text-green-600">+¥10,000 (+20%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ヘッダーコンポーネント
 const Header = ({
   userName,
@@ -944,28 +1257,58 @@ const GoalsSection = () => (
 );
 
 // ナビゲーションアイテムコンポーネント
-const NavItem = ({ icon, label, isActive = false }: {
+const NavItem = ({ icon, label, isActive = false, onClick }: {
   icon: React.ReactNode;
   label: string;
   isActive?: boolean;
+  onClick?: () => void;
 }) => (
-  <button className={`flex flex-col items-center gap-1 ${isActive ? 'text-indigo-600' : 'text-slate-500'} hover:text-indigo-600`}>
+  <button
+    className={`flex flex-col items-center gap-1 ${isActive ? 'text-indigo-600' : 'text-slate-500'} hover:text-indigo-600`}
+    onClick={onClick}
+  >
     {icon}
     <span className={`text-xs ${isActive ? 'font-bold' : ''}`}>{label}</span>
   </button>
 );
 
 // 下部ナビゲーションバーコンポーネント
-const BottomNav = () => (
+const BottomNav = ({
+  activeTab,
+  onTabChange
+}: {
+  activeTab: string;
+  onTabChange: (tab: 'home' | 'analysis' | 'assets' | 'settings') => void;
+}) => (
   <nav className="sticky bottom-0 bg-white/80 backdrop-blur-sm border-t border-slate-200 p-2">
     <div className="flex justify-around items-center h-16">
-      <NavItem icon={<HomeIcon />} label="ホーム" isActive={true} />
-      <NavItem icon={<AnalysisIcon />} label="分析" />
+      <NavItem
+        icon={<HomeIcon />}
+        label="ホーム"
+        isActive={activeTab === 'home'}
+        onClick={() => onTabChange('home')}
+      />
+      <NavItem
+        icon={<AnalysisIcon />}
+        label="分析"
+        isActive={activeTab === 'analysis'}
+        onClick={() => onTabChange('analysis')}
+      />
       <button className="w-14 h-14 mb-8 flex items-center justify-center bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transform hover:scale-110 transition-all">
         <AddIcon />
       </button>
-      <NavItem icon={<AssetsIcon />} label="資産" />
-      <NavItem icon={<SettingsIcon />} label="設定" />
+      <NavItem
+        icon={<AssetsIcon />}
+        label="資産"
+        isActive={activeTab === 'assets'}
+        onClick={() => onTabChange('assets')}
+      />
+      <NavItem
+        icon={<SettingsIcon />}
+        label="設定"
+        isActive={activeTab === 'settings'}
+        onClick={() => onTabChange('settings')}
+      />
     </div>
   </nav>
 );
@@ -1000,6 +1343,7 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [apiUserData, setApiUserData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'home' | 'analysis' | 'assets' | 'settings'>('home');
 
   // コンポーネントマウント時にローカルストレージから認証情報を読み込み
   useEffect(() => {
@@ -1552,32 +1896,89 @@ export default function App() {
     return <InitialSetup onComplete={handleSetupComplete} />;
   }
 
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'home':
+        return (
+          <>
+            <Header
+              userName={userProfile?.name || "田中"}
+              onNotificationTest={simulatePaymentNotification}
+              notificationEnabled={notificationPermission}
+              unreadNotificationCount={notifications.filter(n => !n.isRead).length}
+              onNotificationClick={() => setIsNotificationPopupOpen(true)}
+            />
+            <AiChat
+              messages={messages}
+              inputValue={inputValue}
+              onInputChange={handleInputChange}
+              onSendMessage={handleSendMessage}
+              onOpenPopup={handleOpenChatPopup}
+            />
+            <WalletScoreCard userProfile={userProfile} />
+            <AssetSummary />
+            <GoalsSection />
+          </>
+        );
+      case 'analysis':
+        return (
+          <>
+            <Header
+              userName={userProfile?.name || "田中"}
+              onNotificationTest={simulatePaymentNotification}
+              notificationEnabled={notificationPermission}
+              unreadNotificationCount={notifications.filter(n => !n.isRead).length}
+              onNotificationClick={() => setIsNotificationPopupOpen(true)}
+            />
+            <AnalysisScreen userProfile={userProfile} />
+          </>
+        );
+      case 'assets':
+        return (
+          <>
+            <Header
+              userName={userProfile?.name || "田中"}
+              onNotificationTest={simulatePaymentNotification}
+              notificationEnabled={notificationPermission}
+              unreadNotificationCount={notifications.filter(n => !n.isRead).length}
+              onNotificationClick={() => setIsNotificationPopupOpen(true)}
+            />
+            <AssetsScreen userProfile={userProfile} />
+          </>
+        );
+      case 'settings':
+        return (
+          <>
+            <Header
+              userName={userProfile?.name || "田中"}
+              onNotificationTest={simulatePaymentNotification}
+              notificationEnabled={notificationPermission}
+              unreadNotificationCount={notifications.filter(n => !n.isRead).length}
+              onNotificationClick={() => setIsNotificationPopupOpen(true)}
+            />
+            <div className="text-center text-slate-500 mt-10">
+              <p>設定画面は準備中です</p>
+            </div>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="max-w-sm mx-auto bg-slate-50 h-screen flex flex-col shadow-2xl overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
       <main className="flex-grow overflow-y-auto p-6">
-        <Header
-          userName={userProfile?.name || "田中"}
-          onNotificationTest={simulatePaymentNotification}
-          notificationEnabled={notificationPermission}
-          unreadNotificationCount={notifications.filter(n => !n.isRead).length}
-          onNotificationClick={() => setIsNotificationPopupOpen(true)}
-        />
-        <AiChat
-          messages={messages}
-          inputValue={inputValue}
-          onInputChange={handleInputChange}
-          onSendMessage={handleSendMessage}
-          onOpenPopup={handleOpenChatPopup}
-        />
-        <WalletScoreCard userProfile={userProfile} />
-        <AssetSummary />
-        <GoalsSection />
+        {renderTabContent()}
       </main>
 
       {/* OneSignal通知ボタンのコンテナ */}
       <div className='onesignal-customlink-container'></div>
 
-      <BottomNav />
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       {/* チャットポップアップ */}
       <ChatPopup

@@ -30,6 +30,14 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
+// 通知情報の型定義（バックエンドの実際のデータ構造に合わせて）
+export interface ScoldingNotification {
+  id: number;
+  user_id: string;
+  content: string;
+  created_at: string;
+}
+
 // Gmail監視関連のAPI
 export const emailApi = {
   // ヘルスチェック
@@ -132,6 +140,42 @@ export const authApi = {
   // ログイン
   login: async (credentials: { email: string; password: string }) => {
     const response = await api.post('/auth/login', credentials);
+    return response.data;
+  },
+};
+
+// チャット関連のAPI
+export const chatApi = {
+  // 財務チャットメッセージを送信
+  sendMessage: async (token: string, message: string): Promise<{ response: string; timestamp: string }> => {
+    const response = await api.post('/financial-chat', { message }, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data;
+  },
+
+  // チャット履歴を取得
+  getChatHistory: async (token: string): Promise<{ history: any[] }> => {
+    const response = await api.get('/chat-history', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data;
+  },
+};
+
+// 通知関連のAPI
+export const notificationApi = {
+  // 叱り通知を取得
+  getScoldingNotifications: async (token: string): Promise<{ notifications: ScoldingNotification[] }> => {
+    const response = await api.get('/scolding-notifications', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   },
 };

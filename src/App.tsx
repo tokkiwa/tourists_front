@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { profileApi, InitialUserProfile, authApi } from './services/api';
+import { profileApi, InitialUserProfile, authApi, chatApi, notificationApi, ScoldingNotification } from './services/api';
 
 // AIの表情タイプ定義
 type AiEmotion = 'normal' | 'smile' | 'cry' | 'mad';
@@ -18,6 +18,16 @@ interface UserProfile {
   netWorth: string;
   familySize: string;
   age: string;
+}
+
+// アプリ内通知の定義
+interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  timestamp: Date;
+  isRead: boolean;
 }
 
 // 支払い通知の定義
@@ -64,10 +74,18 @@ const SettingsIcon = () => (
 );
 
 // ヘッダーコンポーネント
-const Header = ({ userName, onNotificationTest, notificationEnabled }: {
+const Header = ({
+  userName,
+  onNotificationTest,
+  notificationEnabled,
+  unreadNotificationCount,
+  onNotificationClick
+}: {
   userName: string,
   onNotificationTest?: () => void,
-  notificationEnabled?: boolean
+  notificationEnabled?: boolean,
+  unreadNotificationCount?: number,
+  onNotificationClick?: () => void
 }) => (
   <header className="flex justify-between items-center mb-8">
     <div>
@@ -85,18 +103,131 @@ const Header = ({ userName, onNotificationTest, notificationEnabled }: {
           通知テスト
         </button>
       )}
-      <button className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100">
+      <button
+        onClick={onNotificationClick}
+        className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"
+        title="通知一覧"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        <span className="absolute top-1 right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-        </span>
+        {unreadNotificationCount && unreadNotificationCount > 0 && (
+          <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+          </span>
+        )}
       </button>
     </div>
   </header>
-);// AIアバターコンポーネント
+);
+
+// 通知パネルコンポーネント
+const NotificationPanel = ({
+  notifications,
+  isOpen,
+  onClose,
+  onMarkAsRead,
+  onMarkAllAsRead
+}: {
+  notifications: AppNotification[];
+  isOpen: boolean;
+  onClose: () => void;
+  onMarkAsRead: (id: string) => void;
+  onMarkAllAsRead: () => void;
+}) => {
+  if (!isOpen) return null;
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const getNotificationIcon = (type: AppNotification['type']) => {
+    switch (type) {
+      case 'success': return '✅';
+      case 'warning': return '⚠️';
+      case 'error': return '❌';
+      default: return '📱';
+    }
+  };
+
+  const getNotificationColor = (type: AppNotification['type']) => {
+    switch (type) {
+      case 'success': return 'text-green-600 bg-green-50';
+      case 'warning': return 'text-orange-600 bg-orange-50';
+      case 'error': return 'text-red-600 bg-red-50';
+      default: return 'text-blue-600 bg-blue-50';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-16">
+      <div className="bg-white rounded-2xl shadow-xl w-[90vw] max-w-sm mx-4 max-h-[75vh] overflow-hidden">
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-lg font-semibold">
+            通知 {unreadCount > 0 && <span className="text-red-500">({unreadCount})</span>}
+          </h3>
+          <div className="flex gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={onMarkAllAsRead}
+                className="text-sm text-blue-600 hover:text-blue-700 px-2 py-1 rounded"
+              >
+                すべて既読
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 p-1"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* 通知リスト */}
+        <div className="overflow-y-auto max-h-96">
+          {notifications.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              通知がありません
+            </div>
+          ) : (
+            notifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${!notification.isRead ? 'bg-blue-50' : ''
+                  }`}
+                onClick={() => onMarkAsRead(notification.id)}
+              >
+                <div className="flex items-start gap-3">
+                  <span className={`text-lg p-2 rounded-full ${getNotificationColor(notification.type)}`}>
+                    {getNotificationIcon(notification.type)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-gray-900 truncate">
+                        {notification.title}
+                      </h4>
+                      {!notification.isRead && (
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1 break-words">
+                      {notification.message}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      {notification.timestamp.toLocaleString('ja-JP')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// AIアバターコンポーネント
 const AiAvatar = ({ emotion = 'normal', size = 'large' }: {
   emotion?: AiEmotion,
   size?: 'small' | 'large'
@@ -141,69 +272,7 @@ const AiAvatar = ({ emotion = 'normal', size = 'large' }: {
 };
 
 // 通知関連のユーティリティ関数
-const NotificationUtils = {
-  // 通知許可を取得
-  async requestPermission(): Promise<boolean> {
-    console.log('通知許可を要求中...');
-
-    if (!('Notification' in window)) {
-      console.log('このブラウザは通知をサポートしていません');
-      return false;
-    }
-
-    console.log('現在の通知許可状態:', Notification.permission);
-
-    if (Notification.permission === 'granted') {
-      console.log('通知許可済み');
-      return true;
-    }
-
-    if (Notification.permission !== 'denied') {
-      console.log('通知許可をユーザーに要求中...');
-      const permission = await Notification.requestPermission();
-      console.log('ユーザーからの回答:', permission);
-      return permission === 'granted';
-    }
-
-    console.log('通知が拒否されています');
-    return false;
-  },
-
-  // ブラウザ通知を送信
-  sendNotification(title: string, options: NotificationOptions = {}) {
-    console.log('通知送信を試行:', title, options);
-
-    if (Notification.permission === 'granted') {
-      console.log('通知を作成中...');
-      try {
-        const notification = new Notification(title, {
-          icon: '/assets/man_1_mad.png',
-          badge: '/assets/man_1_mad.png',
-          ...options
-        });
-
-        console.log('通知が作成されました:', notification);
-
-        // 通知をクリックした時の処理
-        notification.onclick = () => {
-          console.log('通知がクリックされました');
-          window.focus();
-          notification.close();
-        };
-
-        // 自動で閉じる
-        setTimeout(() => {
-          console.log('通知を自動で閉じます');
-          notification.close();
-        }, 5000);
-      } catch (error) {
-        console.error('通知作成エラー:', error);
-      }
-    } else {
-      console.log('通知許可がないため送信できません。現在の許可状態:', Notification.permission);
-    }
-  }
-};
+// OneSignalServiceを使用するため、NotificationUtilsは削除
 
 // LLMによる支払い判定（モック）
 const PaymentAnalyzer = {
@@ -925,6 +994,8 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
+  const [isNotificationPopupOpen, setIsNotificationPopupOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notificationPermission, setNotificationPermission] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -934,6 +1005,9 @@ export default function App() {
   useEffect(() => {
     const savedToken = localStorage.getItem('auth_token');
     const savedProfile = localStorage.getItem('user_profile');
+
+    // 通知許可状態を無効に設定（アプリ内通知を使用）
+    setNotificationPermission(false);
 
     if (savedToken) {
       setAuthToken(savedToken);
@@ -945,8 +1019,30 @@ export default function App() {
       }
 
       loadUserProfile(savedToken);
+      loadNotifications(savedToken);
     }
-  }, []);
+
+    // 通知許可状態の変更を監視（ユーザーが設定で変更した場合）
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && 'Notification' in window) {
+        const newPermission = Notification.permission === 'granted';
+        if (newPermission !== notificationPermission) {
+          console.log('🔔 [許可変更] 通知許可状態が変更されました:', {
+            old: notificationPermission,
+            new: newPermission,
+            browserPermission: Notification.permission
+          });
+          setNotificationPermission(newPermission);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [notificationPermission]);
 
   // APIからユーザープロフィールを読み込む
   const loadUserProfile = async (token: string) => {
@@ -955,7 +1051,7 @@ export default function App() {
 
       console.log('🚀 [API呼び出し] プロフィール取得開始');
       console.log('   - エンドポイント: GET /api/profiles/me');
-      console.log('   - フルURL: http://localhost:5001/api/profiles/me');
+      console.log('   - フルURL: http://localhost:5000/api/profiles/me');
       console.log('   - 認証トークン:', token.substring(0, 20) + '...');
 
       const startTime = Date.now();
@@ -997,6 +1093,29 @@ export default function App() {
     }
   };
 
+  // バックエンドから通知を読み込み
+  const loadNotifications = async (token: string) => {
+    try {
+      console.log('📥 [通知取得開始] バックエンドから通知を取得中...');
+      const response = await notificationApi.getScoldingNotifications(token);
+
+      // バックエンドの通知をAppNotification形式に変換
+      const convertedNotifications: AppNotification[] = response.notifications.map((notification: ScoldingNotification) => ({
+        id: notification.id.toString(),
+        title: '叱り通知',
+        message: notification.content,
+        type: 'warning' as const,
+        timestamp: new Date(notification.created_at),
+        isRead: false // デフォルトで未読とする
+      }));
+
+      setNotifications(convertedNotifications);
+      console.log('✅ [通知取得完了] 通知数:', convertedNotifications.length);
+    } catch (error) {
+      console.error('❌ [通知取得エラー] 通知の読み込みに失敗:', error);
+    }
+  };
+
   // 生年月日から年齢を計算
   const calculateAge = (birthDate: string): string => {
     const today = new Date();
@@ -1015,33 +1134,93 @@ export default function App() {
     setInputValue(e.target.value);
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  // アプリ内通知を追加する関数
+  const addNotification = (title: string, message: string, type: AppNotification['type'] = 'info') => {
+    const newNotification: AppNotification = {
+      id: Date.now().toString(),
+      title,
+      message,
+      type,
+      timestamp: new Date(),
+      isRead: false
+    };
+
+    setNotifications(prev => [newNotification, ...prev]);
+    console.log('📱 [アプリ内通知] 追加:', { title, message, type });
+  };
+
+  // 通知を既読にする関数
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    );
+  };
+
+  // 全通知を既読にする関数
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev =>
+      prev.map(notification => ({ ...notification, isRead: true }))
+    );
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !authToken) return;
 
-    const newUserMessage: Message = { sender: 'user', text: inputValue };
-    const newMessages = [...messages, newUserMessage];
+    const userMessage = inputValue.trim();
+    const newUserMessage: Message = { sender: 'user', text: userMessage };
 
-    setMessages(newMessages);
+    // ユーザーメッセージを即座に追加
+    setMessages(prevMessages => [...prevMessages, newUserMessage]);
     setInputValue('');
 
-    // AIからの返信をシミュレート - メッセージ内容に応じた表情で
-    setTimeout(() => {
-      const responses = [
-        'ご質問ありがとうございます！関連情報を検索しますので、少々お待ちください。',
-        '素晴らしい質問ですね！お役に立てるよう頑張ります。',
-        '申し訳ございませんが、その情報は現在確認できません。',
-        '警告：この操作には注意が必要です。よく確認してください。',
-        'おめでとうございます！目標達成まであと少しです！'
-      ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+    try {
+      console.log('🤖 [チャット] メッセージ送信開始');
+      console.log('   - ユーザーメッセージ:', userMessage);
+      console.log('   - 認証トークン:', authToken ? '有効' : '無効');
+
+      // APIからAIの返信を取得
+      const startTime = Date.now();
+      const response = await chatApi.sendMessage(authToken, userMessage);
+      const endTime = Date.now();
+
+      console.log('✅ [チャット] API レスポンス受信');
+      console.log('   - レスポンス時間:', endTime - startTime, 'ms');
+      console.log('   - AIの返信:', response.response);
+
+      // AIの返信をメッセージに追加
       const aiResponse: Message = {
         sender: 'ai',
-        text: randomResponse,
-        emotion: getEmotionFromMessage(randomResponse)
+        text: response.response,
+        emotion: getEmotionFromMessage(response.response)
       };
+
       setMessages(prevMessages => [...prevMessages, aiResponse]);
-    }, 1000);
+
+    } catch (error) {
+      console.error('❌ [チャット] API エラー');
+      console.error('   - エラー詳細:', error);
+
+      // エラー時のフォールバック応答
+      const errorResponse: Message = {
+        sender: 'ai',
+        text: '申し訳ございません。現在システムに問題が発生しています。しばらく経ってから再度お試しください。',
+        emotion: 'cry'
+      };
+
+      setMessages(prevMessages => [...prevMessages, errorResponse]);
+
+      // エラー通知を追加
+      addNotification(
+        '❌ チャットエラー',
+        'メッセージの送信に失敗しました。ネットワーク接続をご確認ください。',
+        'error'
+      );
+    }
   };
 
   const handleOpenChatPopup = () => {
@@ -1077,9 +1256,15 @@ export default function App() {
       localStorage.setItem('user_profile', JSON.stringify(convertedProfile));
       setIsSetupComplete(true);
 
-      // 通知許可を取得
-      const hasPermission = await NotificationUtils.requestPermission();
-      setNotificationPermission(hasPermission);
+      // 通知を読み込み
+      loadNotifications(token);
+
+      // ログイン成功通知をアプリ内通知に追加
+      addNotification(
+        '🎉 ログイン成功',
+        `${userData.name}さん、おかえりなさい！`,
+        'success'
+      );
 
       // ウェルカムメッセージ
       const welcomeMessage: Message = {
@@ -1088,8 +1273,13 @@ export default function App() {
         emotion: 'smile'
       };
       setMessages([welcomeMessage]);
+
+      // 通知も読み込み
+      loadNotifications(token);
     } else {
       console.log('📝 [認証] プロフィール未設定、初期設定を開始');
+      // 通知を読み込み
+      loadNotifications(token);
       // プロフィール情報がない場合は初期設定に進む
     }
   };
@@ -1117,7 +1307,7 @@ export default function App() {
       try {
         console.log('🚀 [API呼び出し] プロフィール保存開始');
         console.log('   - エンドポイント: PUT /api/profiles/me');
-        console.log('   - フルURL: http://localhost:5001/api/profiles/me');
+        console.log('   - フルURL: http://localhost:5000/api/profiles/me');
         console.log('   - 認証トークン:', authToken.substring(0, 20) + '...');
         console.log('   - 送信データ:', apiProfileData);
 
@@ -1149,37 +1339,21 @@ export default function App() {
 
       setUserProfile(profile);
 
-      // 通知許可を取得
-      console.log('初期設定完了時に通知許可を要求');
-      const hasPermission = await NotificationUtils.requestPermission();
-      console.log('通知許可取得結果:', hasPermission);
-      setNotificationPermission(hasPermission);
-
-      // 通知許可取得時にテスト通知を送信
-      if (hasPermission) {
-        console.log('通知許可が取得できたので、ウェルカム通知を送信');
-        NotificationUtils.sendNotification(
-          '🎉 初期設定完了',
-          {
-            body: `${profile.name}さん、セットアップが完了しました！財務アドバイスの準備ができました。`,
-            icon: '/assets/man_1_smile.png',
-            tag: 'welcome-notification'
-          }
-        );
-      }
+      // 初期設定完了通知をアプリ内通知に追加
+      addNotification(
+        '🎉 初期設定完了',
+        `${profile.name}さん、セットアップが完了しました！財務アドバイスの準備ができました。`,
+        'success'
+      );
 
       // 初期設定完了後の初回メッセージを生成
       const welcomeMessage: Message = {
         sender: 'ai',
         text: `${profile.name}さん、初期設定ありがとうございました！年収${profile.annualIncome}、純資産${profile.netWorth}の${profile.familySize}の情報を元に、最適な財務アドバイスをいたします。
 
-🔔 通知状態: ${hasPermission ? '✅ 有効' : '❌ 無効'}
-ブラウザ許可: ${Notification.permission}
-
-${hasPermission ? 'ブラウザ通知も有効になりました。' : 
-  'ブラウザ通知は無効です。右上の「通知テスト」ボタンで確認してください。'}
+� アプリ内通知システムが有効です。重要な支出アラートなどをお知らせします。
 `,
-        emotion: hasPermission ? 'smile' : 'normal'
+        emotion: 'smile'
       };
       setMessages([welcomeMessage]);
       setIsSetupComplete(true);
@@ -1199,7 +1373,7 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' :
     const age = parseInt(ageString.replace(/[^\d]/g, '')) || 28;
     const currentYear = new Date().getFullYear();
     const birthYear = currentYear - age;
-    return `${ birthYear }-01-01`; // 1月1日として概算
+    return `${birthYear}-01-01`; // 1月1日として概算
   };
 
   // 家族構成から子供の数を抽出
@@ -1288,28 +1462,18 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' :
     if (analysis.isProblematic) {
       console.log('問題のある支払いを検出');
 
-      // ブラウザ通知を送信
-      if (notificationPermission && Notification.permission === 'granted') {
-        console.log('ブラウザ通知を送信します');
-        NotificationUtils.sendNotification(
-          '⚠️ 支出アラート',
-          {
-            body: analysis.reason,
-            icon: '/assets/man_1_mad.png',
-            tag: 'payment-alert'
-          }
-        );
-      } else {
-        console.log('通知許可がありません。許可状態:', {
-          notificationPermission,
-          browserPermission: Notification.permission
-        });
-      }
+      // アプリ内通知として支出アラートを追加
+      console.log('アプリ内通知として支出アラートを送信');
+      addNotification(
+        '⚠️ 支出アラート',
+        analysis.reason,
+        'warning'
+      );
 
       // チャットにもメッセージを追加
       const alertMessage: Message = {
         sender: 'ai',
-        text: `${ userProfile.name } さん、支出アラートです！${ analysis.reason } `,
+        text: `${userProfile.name} さん、支出アラートです！${analysis.reason} `,
         emotion: 'mad'
       };
 
@@ -1319,27 +1483,16 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' :
     }
   };
 
-  // デモ用：ランダムな支払い通知を生成する関数
+  // デモ用：アプリ内通知のテスト関数
   const simulatePaymentNotification = async () => {
-    console.log('テスト通知ボタンがクリックされました');
+    console.log('通知テストボタンがクリックされました');
 
-    // まず直接通知テストを実行
-    const hasPermission = await NotificationUtils.requestPermission();
-    console.log('通知許可取得結果:', hasPermission);
-
-    if (hasPermission) {
-      // 直接通知を送信
-      NotificationUtils.sendNotification(
-        '🔔 テスト通知',
-        {
-          body: 'これはテスト通知です。通知システムが正常に動作しています。',
-          icon: '/assets/man_1_normal.png',
-          tag: 'test-notification'
-        }
-      );
-    }
-
-    // 既存の支払い通知テストも実行
+    // テスト通知をアプリ内通知に追加
+    addNotification(
+      '🔔 テスト通知',
+      'これはテスト通知です。アプリ内通知システムが正常に動作しています。',
+      'info'
+    );    // 既存の支払い通知テストも実行
     const mockPayments: PaymentNotification[] = [
       {
         id: '1',
@@ -1406,6 +1559,8 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' :
           userName={userProfile?.name || "田中"}
           onNotificationTest={simulatePaymentNotification}
           notificationEnabled={notificationPermission}
+          unreadNotificationCount={notifications.filter(n => !n.isRead).length}
+          onNotificationClick={() => setIsNotificationPopupOpen(true)}
         />
         <AiChat
           messages={messages}
@@ -1418,6 +1573,10 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' :
         <AssetSummary />
         <GoalsSection />
       </main>
+
+      {/* OneSignal通知ボタンのコンテナ */}
+      <div className='onesignal-customlink-container'></div>
+
       <BottomNav />
 
       {/* チャットポップアップ */}
@@ -1436,6 +1595,15 @@ ${hasPermission ? 'ブラウザ通知も有効になりました。' :
           Auth: {isAuthenticated ? '✓' : '✗'} | API: {authToken ? '✓' : '✗'} | User: {apiUserData?.email || 'N/A'}
         </div>
       )}
+
+      {/* 通知パネル */}
+      <NotificationPanel
+        notifications={notifications}
+        isOpen={isNotificationPopupOpen}
+        onClose={() => setIsNotificationPopupOpen(false)}
+        onMarkAsRead={markNotificationAsRead}
+        onMarkAllAsRead={markAllNotificationsAsRead}
+      />
     </div>
   );
 }
